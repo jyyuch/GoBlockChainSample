@@ -51,7 +51,7 @@ func Test_fetchBlockByNumber(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			fetchBlockByNumber(tt.args.blockStart, tt.args.blockEnd, tt.args.inOut, tt.args.wg)
+			fetchHeaderByNumber(tt.args.blockStart, tt.args.blockEnd, tt.args.inOut, tt.args.wg)
 
 			for i, v := range tt.args.inOut {
 				assert.NotNil(v)

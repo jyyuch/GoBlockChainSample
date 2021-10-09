@@ -52,7 +52,7 @@ func EthGetLatestBlocks(numLatestBlocks uint64) (*model.ResponseBlocks, error) {
 
 	_ = utils.BatchUint64(numBlocks, batchSize, func(start, end uint64) error {
 		wg.Add(1)
-		go fetchBlockByNumber(start+blockStartIndex, end+blockStartIndex, result.Blocks[start:end+1], &wg)
+		go fetchHeaderByNumber(start+blockStartIndex, end+blockStartIndex, result.Blocks[start:end+1], &wg)
 		return nil
 	})
 
@@ -61,7 +61,33 @@ func EthGetLatestBlocks(numLatestBlocks uint64) (*model.ResponseBlocks, error) {
 	return result, nil
 }
 
-func fetchBlockByNumber(blockStart uint64, blockEnd uint64, inOut []*model.BlockBase, wg *sync.WaitGroup) {
+func EthFetchBlockByNumber(blockNum uint64) (*model.BlockTranx, error) {
+	n := new(big.Int).SetUint64(blockNum)
+	block, err := client.BlockByNumber(ctx, n)
+	if err != nil {
+		logrus.WithFields(logrus.Fields{
+			"block_num": n,
+		}).WithError(err).Error("Failed fetching block")
+		return nil, err
+	}
+
+	result := &model.BlockTranx{
+		BlockBase: model.BlockBase{
+			Num:        block.NumberU64(),
+			Hash:       block.Hash().String(),
+			Time:       block.Time(),
+			ParentHash: block.ParentHash().String(),
+		},
+		Tranx: make([]string, block.Transactions().Len()),
+	}
+	for i, v := range block.Transactions() {
+		result.Tranx[i] = v.Hash().String()
+	}
+
+	return result, nil
+}
+
+func fetchHeaderByNumber(blockStart uint64, blockEnd uint64, inOut []*model.BlockBase, wg *sync.WaitGroup) {
 	defer func() {
 		if wg != nil {
 			wg.Done()
@@ -73,8 +99,9 @@ func fetchBlockByNumber(blockStart uint64, blockEnd uint64, inOut []*model.Block
 		header, err := client.HeaderByNumber(ctx, n)
 		if err != nil {
 			logrus.WithFields(logrus.Fields{
-				"block_num": header.Number.Uint64(),
-			}).WithError(err).Error("Failed fetching block")
+				"block_num": n,
+			}).WithError(err).Error("Failed fetching header")
+			// continue
 		} else {
 			inOut[i-blockStart] = &model.BlockBase{
 				Num:        header.Number.Uint64(),
