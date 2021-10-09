@@ -2,6 +2,7 @@ package main
 
 import (
 	"myModule/model"
+	"myModule/proxy"
 	"net/http"
 	"strconv"
 
@@ -12,44 +13,55 @@ import (
 func main() {
 	r := gin.Default()
 
-	r.GET("/blocks", func(c *gin.Context) {
-		strBlocks := c.DefaultQuery(model.LIMIT, "20")
-		varify := validate.Map(map[string]interface{}{model.LIMIT: strBlocks})
-		varify.StringRule(model.LIMIT, "required|isNumber|min:1|max:20")
-
-		if !varify.Validate() {
-			c.JSON(http.StatusBadRequest, gin.H{"error": varify.Errors.One()})
-			return
-		}
-
-		nBlocks, _ := strconv.Atoi(varify.GetSafe(model.LIMIT).(string))
-
-		result, err := getLatestBlocks(nBlocks)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
-		c.JSON(http.StatusOK, result)
-	})
+	r.GET("/blocks", getBlocks)
+	// r.GET("/blocks/:id", getBlockById)
 
 	r.Run() // listen and serve on 0.0.0.0:8080 (for windows "localhost:8080")
 }
 
-func getLatestBlocks(numLatestBlocks int) (model.ResponseBlocks, error) {
-	return model.ResponseBlocks{
-		Blocks: []model.BlockBase{
-			{
-				Num:        0,
-				Hash:       "hash1",
-				Time:       123456789,
-				ParentHash: "",
-			},
-			{
-				Num:        2,
-				Hash:       "hash2",
-				Time:       123456790,
-				ParentHash: "hash1",
-			},
-		},
-	}, nil
+func getBlocks(c *gin.Context) {
+	// verify params
+	strBlocks := c.DefaultQuery(model.LIMIT, "20")
+	varify := validate.Map(map[string]interface{}{model.LIMIT: strBlocks})
+	varify.StringRule(model.LIMIT, "required|isNumber|min:1|max:20")
+
+	if !varify.Validate() {
+		c.JSON(http.StatusBadRequest, gin.H{"error": varify.Errors.One()})
+		return
+	}
+
+	// get latest n blocks
+	nBlocks, _ := strconv.Atoi(varify.GetSafe(model.LIMIT).(string))
+	result, err := proxy.EthGetLatestBlocks(uint64(nBlocks))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// return 200 ok
+	c.JSON(http.StatusOK, result)
 }
+
+// func getBlockById(c *gin.Context) {
+// 	// verify query params
+// 	blockID := c.Param("id")
+// 	strBlocks := c.DefaultQuery(model.LIMIT, "20")
+// 	varify := validate.Map(map[string]interface{}{model.LIMIT: strBlocks})
+// 	varify.StringRule(model.LIMIT, "required|isNumber|min:1|max:20")
+
+// 	if !varify.Validate() {
+// 		c.JSON(http.StatusBadRequest, gin.H{"error": varify.Errors.One()})
+// 		return
+// 	}
+
+// 	// get latest n blocks
+// 	nBlocks, _ := strconv.Atoi(varify.GetSafe(model.LIMIT).(string))
+// 	result, err := proxy.EthGetLatestBlocks(uint64(nBlocks))
+// 	if err != nil {
+// 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+// 		return
+// 	}
+
+// 	// return 200 ok
+// 	c.JSON(http.StatusOK, result)
+// }

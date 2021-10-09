@@ -1,0 +1,18 @@
+{
+    "rest-client.environmentVariables": {
+        "$shared": {
+            "version": "v1",
+            "prodToken": "foo",
+            "nonProdToken": "bar"
+        },
+        "local": {
+            "host": "http://localhost:8080",
+        },
+        "dev": {
+            "host": "https://api-dev.jyyuch.com",
+        },
+        "trial": {
+            "host": "https://api-trial.jyyuch.com",
+        }
+    }
+}

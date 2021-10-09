@@ -1,0 +1,5 @@
+### [GET] /blocks?limit=n
+GET {{host}}/blocks?limit=10
+
+### [GET] /blocks/:id
+GET {{host}}/blocks/100
