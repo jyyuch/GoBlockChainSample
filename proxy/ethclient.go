@@ -8,6 +8,8 @@ import (
 	"myModule/utils"
 	"sync"
 
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/sirupsen/logrus"
 )
@@ -78,10 +80,10 @@ func EthFetchBlockByNumber(blockNum uint64) (*model.BlockTranx, error) {
 			Time:       block.Time(),
 			ParentHash: block.ParentHash().String(),
 		},
-		Tranx: make([]string, block.Transactions().Len()),
+		TranxHash: make([]string, block.Transactions().Len()),
 	}
 	for i, v := range block.Transactions() {
-		result.Tranx[i] = v.Hash().String()
+		result.TranxHash[i] = v.Hash().String()
 	}
 
 	return result, nil
@@ -111,4 +113,68 @@ func fetchHeaderByNumber(blockStart uint64, blockEnd uint64, inOut []*model.Bloc
 			}
 		}
 	}
+}
+
+func EthFetchTranxByBash(hash string) (*model.Tranx, error) {
+	// fetch tranx by hash
+	tx, _, err := client.TransactionByHash(ctx, common.HexToHash(hash))
+	if err != nil {
+		logrus.WithFields(logrus.Fields{
+			"tranx_hash": hash,
+		}).WithError(err).Error("Failed fetching tranx")
+		return nil, err
+	}
+
+	// get chain id for EIP155 Signer
+	chainID, err := client.NetworkID(ctx)
+	if err != nil {
+		logrus.WithFields(logrus.Fields{
+			"tranx_hash": hash,
+		}).WithError(err).Error("Failed fetching chainID")
+		return nil, err
+	}
+
+	// tranx to msg to get "from" field
+	msg, err := tx.AsMessage(types.NewEIP155Signer(chainID), nil)
+	if err != nil {
+		logrus.WithFields(logrus.Fields{
+			"tranx_hash": hash,
+			"chain_id":   chainID,
+		}).WithError(err).Error("Failed call AsMessage")
+		return nil, err
+	}
+
+	// fetch receipt to get log
+	receipt, err := client.TransactionReceipt(ctx, tx.Hash())
+	if err != nil {
+		logrus.WithFields(logrus.Fields{
+			"tranx_hash": hash,
+			"chain_id":   chainID,
+		}).WithError(err).Error("Failed call TransactionReceipt")
+		return nil, err
+	}
+
+	// logrus.Infof("hash-string", msg.From().Hash().String()) => ok
+	// logrus.Infof("hash-hex", msg.From().Hash().Hex()) => ok
+	// logrus.Infof("hex", msg.From().Hex()) => not right value
+	// logrus.Infof("string", msg.From().String()) => not right value
+
+	result := &model.Tranx{
+		Hash:  tx.Hash().String(),
+		From:  msg.From().Hash().String(),
+		To:    tx.To().Hash().String(),
+		Nonce: tx.Nonce(),
+		Data:  common.BytesToHash(tx.Data()).String(),
+		Value: tx.Value().String(),
+		Logs:  make([]*model.TranxLog, len(receipt.Logs)),
+	}
+
+	for i, v := range receipt.Logs {
+		result.Logs[i] = &model.TranxLog{
+			Index: v.Index,
+			Data:  common.BytesToHash(v.Data).String(),
+		}
+	}
+
+	return result, nil
 }

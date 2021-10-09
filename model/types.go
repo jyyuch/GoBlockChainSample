@@ -13,5 +13,20 @@ type ResponseBlocks struct {
 
 type BlockTranx struct {
 	BlockBase
-	Tranx []string `json:"transactions"`
+	TranxHash []string `json:"transactions"`
+}
+
+type Tranx struct {
+	Hash  string      `json:"tx_hash"`
+	From  string      `json:"from"`
+	To    string      `json:"to"`
+	Nonce uint64      `json:"nonce"`
+	Data  string      `json:"data"`
+	Value string      `json:"value"`
+	Logs  []*TranxLog `json:"logs"`
+}
+
+type TranxLog struct {
+	Index uint   `json:"index"`
+	Data  string `json:"data"`
 }
