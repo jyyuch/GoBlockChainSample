@@ -27,6 +27,10 @@ func init() {
 	client = tmpClient
 }
 
+func EthGetLatestBlockNumber() (uint64, error) {
+	return client.BlockNumber(context.Background())
+}
+
 func EthGetLatestBlocks(numLatestBlocks uint64) (*model.ResponseBlocks, error) {
 	latestBlockNum, err := client.BlockNumber(context.Background())
 	if err != nil {
@@ -119,7 +123,7 @@ func fetchHeaderRangeByNumber(blockStart uint64, blockEnd uint64, inOut []*model
 /**
  * @return DbTranx The filed BlockNum, BlockHash will not set.
  */
-func EthFetchTranxByBash(hash string) (*model.DbTranx, error) {
+func EthFetchTranxByHash(hash string) (*model.DbTranx, error) {
 	if strings.HasPrefix(hash, "0x") {
 		hash = hash[2:]
 	}
@@ -170,11 +174,15 @@ func EthFetchTranxByBash(hash string) (*model.DbTranx, error) {
 	result := &model.DbTranx{
 		Hash:  tx.Hash().String(),
 		From:  msg.From().Hash().String(),
-		To:    tx.To().Hash().String(),
 		Nonce: tx.Nonce(),
 		Data:  common.BytesToHash(tx.Data()).String(),
 		Value: tx.Value().String(),
 		Logs:  make([]model.DbTranxLog, len(receipt.Logs)),
+	}
+
+	// TODO: some Tranx without "To", need to be confirm
+	if tx.To() != nil {
+		result.To = tx.To().Hash().String()
 	}
 
 	for i, v := range receipt.Logs {

@@ -85,7 +85,7 @@ func getTranxByHash(c *gin.Context) {
 	}
 
 	// get latest n blocks
-	result, err := proxy.EthFetchTranxByBash(varify.GetSafe(model.TRANX_HASH).(string))
+	result, err := proxy.EthFetchTranxByHash(varify.GetSafe(model.TRANX_HASH).(string))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return

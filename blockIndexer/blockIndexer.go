@@ -39,7 +39,11 @@ func scanRoutine(blockFrom uint64, blockTo uint64, scanMore bool) {
 
 	scanFrom, scanTo, err := resumeTask(blockFrom, blockTo)
 	if err != nil {
-		logrus.Error(err.Error())
+		logrus.WithFields(logrus.Fields{
+			"scan_from": scanFrom,
+			"scan_to":   scanTo,
+			"scan_more": scanMore,
+		}).WithError(err).Error("Fail call to resumeTask, scan stop")
 		return
 	}
 
@@ -69,24 +73,47 @@ func scanRoutine(blockFrom uint64, blockTo uint64, scanMore bool) {
 			logrus.WithFields(logrus.Fields{
 				"scan_from": scanFrom,
 				"scan_to":   scanTo,
+				"scan_more": scanMore,
 				"key":       proxy.LAST_BLOCK_INDEXED,
-				"value":     scanTo}).WithError(err).Error("Fail call DbStoreSettingAsUint64")
+				"value":     scanTo}).WithError(err).Error("Fail call DbStoreSettingAsUint64, scan stop")
 			return
 		}
 
 		if !scanMore {
+			logrus.Info("ScanMore=false, scan stop")
 			break
 		}
 
 		// update scanFrom , scanTo
-		scanFrom, scanTo = nextTask(scanTo)
+		scanFrom, scanTo, err = nextTask(scanTo)
+		if err != nil {
+			logrus.WithFields(logrus.Fields{
+				"scan_from": scanFrom,
+				"scan_to":   scanTo,
+				"scan_more": scanMore,
+			}).WithError(err).Error("Fail call nextTask, scan stop")
+			return
+		}
 	}
 }
 
-func nextTask(lastBlockIndexed uint64) (scanFrom uint64, scanTo uint64) {
+func nextTask(lastBlockIndexed uint64) (scanFrom uint64, scanTo uint64, err error) {
 	scanFrom = lastBlockIndexed + 1
 	scanTo = lastBlockIndexed + config.NUM_BLOCKS_SCAN_ONCE
-	return scanFrom, scanTo
+	latestBlock, err := proxy.EthGetLatestBlockNumber()
+
+	if err != nil {
+		logrus.WithError(err).Error("Fail call EthGetLatestBlockNumber")
+		return 0, 0, err
+	}
+
+	if scanFrom > latestBlock {
+		return 0, 0, errors.New("Rich latest block and No block to scan")
+	} else if scanTo > latestBlock {
+		scanTo = latestBlock
+	}
+
+	return scanFrom, scanTo, nil
 }
 
 func resumeTask(userScanFrom uint64, userScanTo uint64) (scanFrom uint64, scanTo uint64, err error) {
@@ -114,11 +141,21 @@ func resumeTask(userScanFrom uint64, userScanTo uint64) (scanFrom uint64, scanTo
 		scanTo = userScanTo
 	}
 
+	// set default if userInput and db all 0
+	if scanFrom == 0 && scanTo == 0 {
+		scanFrom = 0
+		scanTo = 20
+	}
+
 	// check scan task is all indexed
-	if scanTo <= dbLastIndexed {
-		scanFrom, scanTo = nextTask(dbLastIndexed)
-	} else {
-		scanFrom = dbLastIndexed + 1
+	// if no block indexed
+	if dbLastIndexed > 0 {
+		if scanTo <= dbLastIndexed {
+			scanFrom, scanTo, err = nextTask(dbLastIndexed)
+			return 0, 0, err
+		} else {
+			scanFrom = dbLastIndexed + 1
+		}
 	}
 
 	return scanFrom, scanTo, nil
@@ -161,7 +198,7 @@ func scanBlockRangeByNumber(blockStart uint64, blockEnd uint64, wg *sync.WaitGro
 		}
 
 		for j, v := range blockTranx.TranxHash {
-			dbTranx, innerErr := proxy.EthFetchTranxByBash(v)
+			dbTranx, innerErr := proxy.EthFetchTranxByHash(v)
 			if innerErr != nil {
 				logrus.WithFields(logrus.Fields{
 					"block_num":  scanBlock,
