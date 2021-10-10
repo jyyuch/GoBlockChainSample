@@ -6,6 +6,7 @@ import (
 	"myModule/config"
 	"myModule/model"
 	"myModule/utils"
+	"strings"
 	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -50,11 +51,11 @@ func EthGetLatestBlocks(numLatestBlocks uint64) (*model.ResponseBlocks, error) {
 	var wg sync.WaitGroup
 
 	result := &model.ResponseBlocks{}
-	result.Blocks = make([]*model.BlockBase, numBlocks)
+	result.Blocks = make([]*model.DbBlockBase, numBlocks)
 
 	_ = utils.BatchUint64(numBlocks, batchSize, func(start, end uint64) error {
 		wg.Add(1)
-		go fetchHeaderByNumber(start+blockStartIndex, end+blockStartIndex, result.Blocks[start:end+1], &wg)
+		go fetchHeaderRangeByNumber(start+blockStartIndex, end+blockStartIndex, result.Blocks[start:end+1], &wg)
 		return nil
 	})
 
@@ -74,7 +75,7 @@ func EthFetchBlockByNumber(blockNum uint64) (*model.BlockTranx, error) {
 	}
 
 	result := &model.BlockTranx{
-		BlockBase: model.BlockBase{
+		DbBlockBase: model.DbBlockBase{
 			Num:        block.NumberU64(),
 			Hash:       block.Hash().String(),
 			Time:       block.Time(),
@@ -89,7 +90,7 @@ func EthFetchBlockByNumber(blockNum uint64) (*model.BlockTranx, error) {
 	return result, nil
 }
 
-func fetchHeaderByNumber(blockStart uint64, blockEnd uint64, inOut []*model.BlockBase, wg *sync.WaitGroup) {
+func fetchHeaderRangeByNumber(blockStart uint64, blockEnd uint64, inOut []*model.DbBlockBase, wg *sync.WaitGroup) {
 	defer func() {
 		if wg != nil {
 			wg.Done()
@@ -105,7 +106,7 @@ func fetchHeaderByNumber(blockStart uint64, blockEnd uint64, inOut []*model.Bloc
 			}).WithError(err).Error("Failed fetching header")
 			// continue
 		} else {
-			inOut[i-blockStart] = &model.BlockBase{
+			inOut[i-blockStart] = &model.DbBlockBase{
 				Num:        header.Number.Uint64(),
 				Hash:       header.Hash().String(),
 				Time:       header.Time,
@@ -115,7 +116,14 @@ func fetchHeaderByNumber(blockStart uint64, blockEnd uint64, inOut []*model.Bloc
 	}
 }
 
-func EthFetchTranxByBash(hash string) (*model.Tranx, error) {
+/**
+ * @return DbTranx The filed BlockNum, BlockHash will not set.
+ */
+func EthFetchTranxByBash(hash string) (*model.DbTranx, error) {
+	if strings.HasPrefix(hash, "0x") {
+		hash = hash[2:]
+	}
+
 	// fetch tranx by hash
 	tx, _, err := client.TransactionByHash(ctx, common.HexToHash(hash))
 	if err != nil {
@@ -159,20 +167,21 @@ func EthFetchTranxByBash(hash string) (*model.Tranx, error) {
 	// logrus.Infof("hex", msg.From().Hex()) => not right value
 	// logrus.Infof("string", msg.From().String()) => not right value
 
-	result := &model.Tranx{
+	result := &model.DbTranx{
 		Hash:  tx.Hash().String(),
 		From:  msg.From().Hash().String(),
 		To:    tx.To().Hash().String(),
 		Nonce: tx.Nonce(),
 		Data:  common.BytesToHash(tx.Data()).String(),
 		Value: tx.Value().String(),
-		Logs:  make([]*model.TranxLog, len(receipt.Logs)),
+		Logs:  make([]model.DbTranxLog, len(receipt.Logs)),
 	}
 
 	for i, v := range receipt.Logs {
-		result.Logs[i] = &model.TranxLog{
-			Index: v.Index,
-			Data:  common.BytesToHash(v.Data).String(),
+		result.Logs[i] = model.DbTranxLog{
+			TranxHash: result.Hash,
+			Index:     v.Index,
+			Data:      common.BytesToHash(v.Data).String(),
 		}
 	}
 

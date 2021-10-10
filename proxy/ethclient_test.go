@@ -14,7 +14,7 @@ func Test_fetchBlockByNumber(t *testing.T) {
 	type args struct {
 		blockStart uint64
 		blockEnd   uint64
-		inOut      []*model.BlockBase
+		inOut      []*model.DbBlockBase
 		wg         *sync.WaitGroup
 	}
 	tests := []struct {
@@ -26,7 +26,7 @@ func Test_fetchBlockByNumber(t *testing.T) {
 			args: args{
 				blockStart: 0,
 				blockEnd:   0,
-				inOut:      make([]*model.BlockBase, 1),
+				inOut:      make([]*model.DbBlockBase, 1),
 				wg:         &sync.WaitGroup{},
 			},
 		},
@@ -35,7 +35,7 @@ func Test_fetchBlockByNumber(t *testing.T) {
 			args: args{
 				blockStart: 0,
 				blockEnd:   1,
-				inOut:      make([]*model.BlockBase, 1-0+1),
+				inOut:      make([]*model.DbBlockBase, 1-0+1),
 				wg:         &sync.WaitGroup{},
 			},
 		},
@@ -44,14 +44,14 @@ func Test_fetchBlockByNumber(t *testing.T) {
 			args: args{
 				blockStart: 1,
 				blockEnd:   21,
-				inOut:      make([]*model.BlockBase, 21-1+1),
+				inOut:      make([]*model.DbBlockBase, 21-1+1),
 				wg:         &sync.WaitGroup{},
 			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			fetchHeaderByNumber(tt.args.blockStart, tt.args.blockEnd, tt.args.inOut, tt.args.wg)
+			fetchHeaderRangeByNumber(tt.args.blockStart, tt.args.blockEnd, tt.args.inOut, tt.args.wg)
 
 			for i, v := range tt.args.inOut {
 				assert.NotNil(v)

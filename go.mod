@@ -12,4 +12,7 @@ require (
 	github.com/sirupsen/logrus v1.8.1
 	github.com/stretchr/testify v1.7.0
 	go.uber.org/zap v1.19.1
+	gorm.io/driver/postgres v1.1.2
+	gorm.io/driver/sqlite v1.1.6
+	gorm.io/gorm v1.21.16
 )

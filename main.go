@@ -1,6 +1,8 @@
 package main
 
 import (
+	"fmt"
+	"myModule/blockIndexer"
 	"myModule/model"
 	"myModule/proxy"
 	"net/http"
@@ -17,6 +19,7 @@ func main() {
 	r.GET("/blocks", getBlocks)
 	r.GET("/blocks/:id", getBlockById)
 	r.GET("/transaction/:txHash", getTranxByHash)
+	r.GET("/block_indexer/scan", blockIndexerScan)
 
 	r.Run() // listen and serve on 0.0.0.0:8080 (for windows "localhost:8080")
 }
@@ -90,4 +93,56 @@ func getTranxByHash(c *gin.Context) {
 
 	// return 200 ok
 	c.JSON(http.StatusOK, result)
+}
+
+func blockIndexerScan(c *gin.Context) {
+	// verify params
+	strFrom := c.DefaultQuery(model.FROM, "0")
+	strTo := c.DefaultQuery(model.TO, "0")
+	strScanMore := c.DefaultQuery(model.SCAN_MORE, "true")
+
+	varify := validate.Map(map[string]interface{}{
+		model.SCAN_MORE: strScanMore,
+		model.FROM:      strFrom,
+		model.TO:        strTo,
+	})
+
+	varify.StringRule(model.SCAN_MORE, "isBool")
+	varify.FilterRule(model.SCAN_MORE, "bool")
+	varify.StringRule(model.FROM, "required|isNumber")
+	varify.StringRule(model.TO, "required|isNumber")
+
+	if !varify.Validate() {
+		c.JSON(http.StatusBadRequest, gin.H{"error": varify.Errors.One()})
+		return
+	}
+
+	scanFrom, err := strconv.ParseUint(varify.GetSafe(model.FROM).(string), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	scanTo, err := strconv.ParseUint(varify.GetSafe(model.TO).(string), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if scanTo != 0 && scanFrom >= scanTo {
+		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("scan block \"from\" should small than \"to\"")})
+		return
+	}
+
+	scanMore := varify.FilteredData()[model.SCAN_MORE].(bool)
+
+	// get latest n blocks
+	start := blockIndexer.StartScanRoutine(scanFrom, scanTo, scanMore)
+
+	if start {
+		// return 200 ok
+		c.Status(http.StatusOK)
+	} else {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "already running"})
+	}
 }

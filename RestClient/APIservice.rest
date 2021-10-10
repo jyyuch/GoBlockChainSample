@@ -7,3 +7,10 @@ GET {{host}}/blocks/13064886
 
 ### [GET] /transaction/:txHash
 GET {{host}}/transaction/0xff09cc3d65e71c3ac6c17e253befd62ae298b33f30f30d19e1b99523f2cd91f4
+
+
+### block indexer scan
+GET {{host}}/block_indexer/scan?from=0&to=3&scan_more=false
+
+### block indexer continue scan
+GET {{host}}/block_indexer/scan
